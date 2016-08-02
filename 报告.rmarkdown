@@ -1,0 +1,95 @@
+---
+title: "NSF数据库分析"
+author: "罗炜"
+date: "2016/8/2"
+output: word_document
+---
+说明：前期已经从NSF官方网站上下载了1959年以来共50万条项目支持数据，并整合进我们构造的数据库中。以下分析的数据来源均为自建的数据库。
+
+#1. 变量名与含义
+
++ AwardTitle 资助项目的名称
++ AwardEffectiveDate 资助项目的生效日期
++ AwardExpirationDate 资助项目的完成日期
++ AwardAmount 资助的金额
++ AwardInstrument.Value 合作类型
++ Organization.Code 组织代码（什么组织？）
++ Organization.Directorate.LongName NSF董事会全名
++ Organization.Division.LongName NSF分支全名
++ ProgramOfficer.SignBlockName 项目官员签名
++ AwardID 资助项目ID
++ Investigator.FirstName 申请人名
++ Investigator.LastName 申请人姓
++ Investigator.EmailAddress 申请人邮箱
++ Investigator.StartDate 申请开始日期
++ Investigator.RoleCode 申请人在研究中的角色
++ Institution.Name 申请人机构名称
++ Institution.CityName 机构所在城市名称
++ Institution.ZipCode 机构Zip编码
++ Institution.PhoneNumber 机构电话
++ Institution.StreetAddress 机构地址
++ Institution.CountryName 机构所在国家
++ Institution.StateName 机构所在州
++ Institution.StateCode 机构所在州代码
++ AbstractNarration 项目摘要
++ MinAmdLetterDate 初步修订日期
++ MaxAmdLetterDate 最终修订日期
+
+#2. 描述统计
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+msg2<-read.csv("msg2.csv")
+```
+##2.1 历年立项数
+
+```{r}
+a=ddply(msg2,c("year","Organization.Directorate.LongName"),summarise,freq=length(year))
+ggplot(a,aes(x=year,y=freq,color=Organization.Directorate.LongName))+
+  geom_line(stat="identity")+
+  geom_point(size=0.8)+
+  facet_wrap(~Organization.Directorate.LongName,scales = "free_y",ncol=3)+
+  guides(color=F)
+```
+
+##2.2 资金支持(平均数)
+```{r}
+a=ddply(msg2,c("year","Organization.Directorate.LongName"),summarise,freq=mean(AwardAmount))
+ggplot(a,aes(x=year,y=freq,color=Organization.Directorate.LongName))+
+  geom_line(stat="identity")+
+  geom_point(size=0.8)+
+  facet_wrap(~Organization.Directorate.LongName,scales = "free_y",ncol=3)+
+  guides(color=F)
+```
+
+##2.3 合作类型
+```{r}
+a=ddply(msg2,c("year","AwardInstrument.Value"),summarise,freq=length(AwardInstrument.Value))
+ggplot(a,aes(x=year,y=freq,color=AwardInstrument.Value))+
+  geom_line(stat="identity")+
+  geom_point(size=0.8)+
+  facet_wrap(~AwardInstrument.Value,scales = "free_y",ncol=4)+
+  guides(color=F)
+```
+
+##2.4 执行期限
+```{r}
+msg2$Duration<-round((msg2$AwardExpirationDate-msg2$AwardEffectiveDate)/365,2)
+a=ddply(msg2,c("year","Organization.Directorate.LongName"),summarise,freq=mean(Duration))
+ggplot(a,aes(x=year,y=freq,color=Organization.Directorate.LongName))+
+  geom_line(stat="identity")+
+  geom_point(size=0.8)+
+  facet_wrap(~Organization.Directorate.LongName,scales = "free_y",ncol=4)+
+  guides(color=F)+ylab("Project Duration (y)")
+```
+
+#3.对教育的支持
+我们从项目标题和摘要中提取关键词，以确认项目是否与教育相关。这些关键词包括
+school|college|classroom|student|curriculum|K12|K-12|STEM|teacher|educat
+```{r}
+edu<-subset(msg2,grepl(msg2$AwardTitle,pattern = "school|college|classroom|student|curriculum|K12|K-12|STEM|teacher|educat")==1 |grepl(msg2$AbstractNarration,pattern = "school|college|classroom|student|curriculum|K12|K-12|STEM|teacher|educat")==1)
+```
+
+
